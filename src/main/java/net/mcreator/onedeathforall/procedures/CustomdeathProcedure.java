@@ -11,6 +11,10 @@ import net.minecraft.world.IWorld;
 import net.minecraft.util.text.StringTextComponent;
 import net.minecraft.util.DamageSource;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.scoreboard.Scoreboard;
+import net.minecraft.scoreboard.ScoreObjective;
+import net.minecraft.scoreboard.ScoreCriteria;
+import net.minecraft.scoreboard.Score;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.effect.LightningBoltEntity;
 import net.minecraft.entity.Entity;
@@ -65,6 +69,8 @@ public class CustomdeathProcedure extends OnedeathforallModElements.ModElement {
 				if (mcserv != null)
 					mcserv.getPlayerList()
 							.sendMessage(new StringTextComponent((((entity.getDisplayName().getString())) + "" + ("ruined it for everyone..."))));
+							// this sends the message to everyone, though may double up.
+							// TODO: Reduce spam calling.
 			}
 			if (world instanceof ServerWorld)
 				((ServerWorld) world).addLightningBolt(new LightningBoltEntity(world.getWorld(), (int) x, (int) y, (int) z, true));
@@ -72,7 +78,33 @@ public class CustomdeathProcedure extends OnedeathforallModElements.ModElement {
 				List<? extends PlayerEntity> _players = world.getPlayers();
 				for (Entity entityiterator : _players) {
 					if ((entityiterator.isAlive())) {
-						entityiterator.attackEntityFrom(DamageSource.GENERIC, (float) 20000);
+						entityiterator.attackEntityFrom(DamageSource.LIGHTNING_BOLT, (float) 20000); // Deaths to everyone that's alive for non-repeated deaths.
+						{
+							Entity _ent = entity;
+							if (_ent instanceof PlayerEntity) {
+								Scoreboard _sc = ((PlayerEntity) _ent).getWorldScoreboard();
+								ScoreObjective _so = _sc.getObjective("Global Caused Deaths");
+								if (_so == null) {
+									_so = _sc.addObjective("Global Caused Deaths", ScoreCriteria.DUMMY,
+											new StringTextComponent("Global Caused Deaths"), ScoreCriteria.RenderType.INTEGER);
+								}
+								// This will be tracked.
+								Score _scr = _sc.getOrCreateScore(((PlayerEntity) _ent).getScoreboardName(), _so);
+								_scr.setScorePoints((int) ((new Object() {
+									public int getScore(String score) {
+										if (entity instanceof PlayerEntity) {
+											Scoreboard _sc = ((PlayerEntity) entity).getWorldScoreboard();
+											ScoreObjective _so = _sc.getObjective(score);
+											if (_so != null) {
+												Score _scr = _sc.getOrCreateScore(((PlayerEntity) entity).getScoreboardName(), _so);
+												return _scr.getScorePoints();
+											}
+										}
+										return 0;
+									}
+								}.getScore("Global Caused Deaths")) + 1));
+							}
+						}
 					}
 				}
 			}
